@@ -1,5 +1,6 @@
 import pickle as pkl
 import time
+from scipy import datasets
 import torch.nn.functional as F
 import dgl
 import networkx as nx
@@ -166,10 +167,13 @@ def preload_entity_level_dataset(path):
         for g in train_gs:
             g = transform_graph(g, node_feature_dim, edge_feature_dim)
             result_train_gs.append(g)
+        with open(path + '/malicious_train_list.txt', 'r', encoding='utf-8') as fr:
+            malicious_train_list = json.load(fr)
         metadata = {
             'node_feature_dim': node_feature_dim,
             'edge_feature_dim': edge_feature_dim,
             'malicious': malicious,
+            'malicious_labels': malicious_train_list,
             'n_train': len(result_train_gs),
             'n_test': len(result_test_gs)
         }

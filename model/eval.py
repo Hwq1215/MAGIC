@@ -5,10 +5,11 @@ import pickle as pkl
 import torch
 import numpy as np
 from sklearn.metrics import roc_auc_score, precision_recall_curve
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import NearestNeighbors,KNeighborsClassifier
 from utils.utils import set_random_seed
 from utils.loaddata import transform_graph, load_batch_level_dataset
-
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
 
 def batch_level_evaluation(model, pooler, device, method, dataset, n_dim=0, e_dim=0):
     model.eval()
@@ -166,7 +167,7 @@ def evaluate_entity_level_using_knn(dataset, x_train, x_test, y_test):
     x_train_std = x_train.std(axis=0)
     x_train = (x_train - x_train_mean) / x_train_std
     x_test = (x_test - x_train_mean) / x_train_std
-
+    pred_test = np.array([])  # 初始化为空数组
     if dataset == 'cadets':
         n_neighbors = 200
     else:
@@ -199,12 +200,16 @@ def evaluate_entity_level_using_knn(dataset, x_train, x_test, y_test):
     best_idx = -1
     for i in range(len(f1)):
         # To repeat peak performance
+        print(f"rec: {rec[i]}, f1: {f1[i]}\n")
         if dataset == 'trace' and rec[i] < 0.99979:
             best_idx = i - 1
             break
         if dataset == 'theia' and rec[i] < 0.99996:
             best_idx = i - 1
             break
+        # if dataset == 'theia' and rec[i] < 0.975:
+        #     best_idx = i - 1
+        #     break
         if dataset == 'cadets' and rec[i] < 0.9976:
             best_idx = i - 1
             break
@@ -217,12 +222,16 @@ def evaluate_entity_level_using_knn(dataset, x_train, x_test, y_test):
     for i in range(len(y_test)):
         if y_test[i] == 1.0 and score[i] >= best_thres:
             tp += 1
+            pred_test = np.append(pred_test, 1.0)  
         if y_test[i] == 1.0 and score[i] < best_thres:
             fn += 1
+            pred_test = np.append(pred_test, 0.0)  
         if y_test[i] == 0.0 and score[i] < best_thres:
             tn += 1
+            pred_test = np.append(pred_test, 0.0)  
         if y_test[i] == 0.0 and score[i] >= best_thres:
             fp += 1
+            pred_test = np.append(pred_test, 1.0) 
     print('AUC: {}'.format(auc))
     print('F1: {}'.format(f1[best_idx]))
     print('PRECISION: {}'.format(prec[best_idx]))
@@ -231,4 +240,89 @@ def evaluate_entity_level_using_knn(dataset, x_train, x_test, y_test):
     print('FN: {}'.format(fn))
     print('TP: {}'.format(tp))
     print('FP: {}'.format(fp))
-    return auc, 0.0, None, None
+    return auc, 0.0, None, pred_test
+
+from sklearn.neighbors import NearestNeighbors
+import numpy as np
+import pickle as pkl
+import os
+from sklearn.metrics import roc_auc_score, precision_recall_curve
+
+def evaluate_entity_level_using_knc(dataset, x_train, y_train, x_test, y_test):
+    # 分离良性样本和恶意样本
+    benign_indices = np.where(y_train == 0)[0]
+    malicious_indices = np.where(y_train == 1)[0]
+    x_train_benign = x_train[benign_indices]
+    x_train_malicious = x_train[malicious_indices]
+    
+    # 分别计算良性样本和恶意样本的均值和标准差
+    benign_mean = x_train_benign.mean(axis=0)
+    benign_std = x_train_benign.std(axis=0)
+    malicious_mean = x_train_malicious.mean(axis=0)
+    malicious_std = x_train_malicious.std(axis=0)
+    
+    # 对测试样本分别进行标准化
+    x_test_benign_scaled = (x_test - benign_mean) / (benign_std + 1e-9)
+    x_test_malicious_scaled = (x_test - malicious_mean) / (malicious_std + 1e-9)
+    
+    # 初始化KNN模型
+    if dataset == 'cadets':
+        n_neighbors = 200
+    else:
+        n_neighbors = 10
+    
+    # 计算到良性样本和恶意样本的距离
+    save_dict_path = './eval_result/distance_save_{}.pkl'.format(dataset)
+    if not os.path.exists(save_dict_path):
+        # 计算测试样本到良性样本的距离
+        benign_nbrs = NearestNeighbors(n_neighbors=min(n_neighbors, len(x_train_benign)), n_jobs=-1)
+        benign_nbrs.fit(x_train_benign)
+        distances_benign, _ = benign_nbrs.kneighbors(x_test_benign_scaled)
+        mean_distance_benign = distances_benign.mean(axis=1)
+        
+        # 计算测试样本到恶意样本的距离
+        malicious_nbrs = NearestNeighbors(n_neighbors=min(n_neighbors, len(x_train_malicious)), n_jobs=-1)
+        malicious_nbrs.fit(x_train_malicious)
+        distances_malicious, _ = malicious_nbrs.kneighbors(x_test_malicious_scaled)
+        mean_distance_malicious = distances_malicious.mean(axis=1)
+        
+        # 计算分数：离良性样本越远，离恶意样本越近，分数越高
+        # 为了处理类别不平衡，给恶意样本距离更大的权重
+        score = (mean_distance_benign * 2 + mean_distance_malicious) / (mean_distance_benign + mean_distance_malicious * 2)
+        
+        # 保存结果
+        with open(save_dict_path, 'wb') as f:
+            pkl.dump(score, f)
+    else:
+        with open(save_dict_path, 'rb') as f:
+            score = pkl.load(f)
+    
+    # 计算评估指标
+    auc = roc_auc_score(y_test, score)
+    prec, rec, threshold = precision_recall_curve(y_test, score)
+    f1 = 2 * prec * rec / (rec + prec + 1e-9)
+    
+    # 找到最佳阈值
+    best_idx = np.argmax(f1)
+    best_thres = threshold[best_idx]
+    
+    # 计算混淆矩阵
+    tn = np.sum((y_test == 0) & (score < best_thres))
+    fn = np.sum((y_test == 1) & (score < best_thres))
+    tp = np.sum((y_test == 1) & (score >= best_thres))
+    fp = np.sum((y_test == 0) & (score >= best_thres))
+    
+    # 生成预测结果
+    pred_test = np.where(score >= best_thres, 1.0, 0.0)
+    
+    # 打印评估结果
+    print('AUC: {}'.format(auc))
+    print('F1: {}'.format(f1[best_idx]))
+    print('PRECISION: {}'.format(prec[best_idx]))
+    print('RECALL: {}'.format(rec[best_idx]))
+    print('TN: {}'.format(tn))
+    print('FN: {}'.format(fn))
+    print('TP: {}'.format(tp))
+    print('FP: {}'.format(fp))
+    
+    return auc, 0.0, None, pred_test

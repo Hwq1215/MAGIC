@@ -1,0 +1,6 @@
+--2025-04-17 06:47:25--  https://dvn-cloud.s3.amazonaws.com/10.7910/DVN/IA8UOS/1664ba79c2c-7d2c4fad0e57?response-content-disposition=attachment%3B%20filename%2A%3DUTF-8%27%27attack_baseline.tar.gz
+Resolving dvn-cloud.s3.amazonaws.com (dvn-cloud.s3.amazonaws.com)... 54.231.160.241, 52.217.225.81, 52.216.43.25, ...
+Connecting to dvn-cloud.s3.amazonaws.com (dvn-cloud.s3.amazonaws.com)|54.231.160.241|:443... connected.
+HTTP request sent, awaiting response... 400 Bad Request
+2025-04-17 06:47:26 ERROR 400: Bad Request.
+

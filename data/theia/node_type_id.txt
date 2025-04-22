@@ -1,0 +1,7 @@
+{
+    "SUBJECT_PROCESS": 0,
+    "FILE_OBJECT_BLOCK": 1,
+    "MemoryObject": 2,
+    "NetFlowObject": 3,
+    "PRINCIPAL_LOCAL": 4
+}

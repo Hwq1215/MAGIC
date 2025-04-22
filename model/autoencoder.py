@@ -1,3 +1,4 @@
+from matplotlib.backend_bases import ToolContainerBase
 from .gat import GAT
 from utils.utils import create_norm
 from functools import partial
@@ -43,7 +44,8 @@ class GMAEModel(nn.Module):
         self._mask_rate = mask_rate
         self._output_hidden_size = hidden_dim
         self.recon_loss = nn.BCELoss(reduction='mean')
-
+        self.supervised_loss = nn.CrossEntropyLoss()  # 有监督损失函数
+        self.contrastive_loss = nn.CosineEmbeddingLoss()  # 对比损失函数
         def init_weights(m):
             if isinstance(m, nn.Linear):
                 nn.init.xavier_uniform(m.weight)
@@ -63,6 +65,14 @@ class GMAEModel(nn.Module):
 
         dec_in_dim = hidden_dim
         dec_num_hidden = hidden_dim
+
+        # 分类器，用于有监督学习
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dim * n_layers, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 2)  # 假设有两个类别
+        )
+        self.classifier.apply(init_weights)
 
         # build encoder
         self.encoder = GAT(
@@ -133,11 +143,14 @@ class GMAEModel(nn.Module):
 
         return new_g, (mask_nodes, keep_nodes)
 
-    def forward(self, g):
+    def forward1(self, g):
         loss = self.compute_loss(g)
         return loss
 
-    def compute_loss(self, g):
+    def forward(self, g, label,dif_g):
+        loss = self.compute_loss(g,label,dif_g)
+        return loss
+    def compute_loss(self, g , label=None,diffent_g=None):
         # Feature Reconstruction
         pre_use_g, (mask_nodes, keep_nodes) = self.encoding_mask_noise(g, self._mask_rate)
         pre_use_x = pre_use_g.ndata['attr'].to(pre_use_g.device)
@@ -149,8 +162,9 @@ class GMAEModel(nn.Module):
         recon = self.decoder(pre_use_g, rep)
         x_init = g.ndata['attr'][mask_nodes]
         x_rec = recon[mask_nodes]
-        loss = self.criterion(x_rec, x_init)
-
+        recon_rec_val = self.criterion(x_rec, x_init)
+        
+        
         # Structural Reconstruction
         threshold = min(10000, g.num_nodes())
 
@@ -162,8 +176,67 @@ class GMAEModel(nn.Module):
         y_pred = self.edge_recon_fc(torch.cat([sample_src, sample_dst], dim=-1)).squeeze(-1)
         y = torch.cat([torch.ones(len(positive_edge_pairs[0])), torch.zeros(len(negative_edge_pairs[0]))]).to(
             g.device)
-        loss += self.recon_loss(y_pred, y)
+        
+        recon_loss_val = self.recon_loss(y_pred, y)
+        
+        supervised_loss = torch.tensor(0.0).to(g.device)
+        #有监督学习部分
+        if label is not None:
+            label = torch.tensor([label], dtype=torch.long).to(g.device)
+            # 扩充 label 为与 enc_rep 批量大小一致的 Tensor
+            label = label.expand(enc_rep.size(0))
+            # 计算分类损失
+            supervised_loss = self.supervised_loss(self.classifier(enc_rep), label)
+        
+        # 紧凑损失部分
+        compactness_loss_val =  torch.tensor(0.0).to(g.device)
+        if False:
+            # 计算良性样本之间的平均距离
+            benign_centroid = torch.mean(enc_rep, dim=0, keepdim=True)
+            compactness_loss_val = torch.mean(torch.norm(benign_embed - benign_centroid, p=2, dim=1))
+        
+        # 对比学习部分
+        contrastive_loss_val =  torch.tensor(0.0).to(g.device)
+        if diffent_g is not None:
+            # 对恶意样本图进行编码
+            diffent_g_enc_rep, diffent_g_enc_hidden = self.encoder(diffent_g, diffent_g.ndata['attr'], return_hidden=True)
+            # 如果 encoder 返回的是一个元组或列表，将它们在特征维度上进行拼接
+
+            diffent_g_enc_rep = torch.cat(diffent_g_enc_hidden, dim=1)
+ 
+            
+            # 获取恶意样本和正常样本的嵌入
+            malicious_embed = diffent_g_enc_rep
+            benign_embed = enc_rep
+            # 确保恶意样本和正常样本的嵌入维度一致
+            num_malicious = malicious_embed.size(0)
+            num_benign = benign_embed.size(0)
+            
+            # 随机选择1024个节点嵌入进行对比学习
+            num_malicious = malicious_embed.size(0)
+            num_benign = benign_embed.size(0)
+            
+            # 随机选择1024个恶意样本
+            malicious_indices = torch.randperm(num_malicious)[:1024].to(g.device)
+            malicious_embed_sampled = malicious_embed[malicious_indices]
+            
+            # 随机选择1024个良性样本
+            benign_indices = torch.randperm(num_benign)[:1024].to(g.device)
+            benign_embed_sampled = benign_embed[benign_indices]
+            
+            # 创建对比损失的目标标签（-1 表示不同类别）
+            contrastive_labels = torch.full((1024,), -1, dtype=torch.long).to(g.device)
+            
+            # 计算对比损失
+            contrastive_loss_val += self.contrastive_loss(malicious_embed_sampled, benign_embed_sampled, contrastive_labels)
+            
+        loss = recon_rec_val + recon_loss_val + supervised_loss + contrastive_loss_val + compactness_loss_val
+        print(f"recon_rec_val: {recon_rec_val.item()}, recon_loss_val: {recon_loss_val.item()}, supervised_loss: {supervised_loss.item()}, contrastive_loss:{contrastive_loss_val.item()}\n")
         return loss
+        
+
+
+        
 
     def embed(self, g):
         x = g.ndata['attr'].to(g.device)

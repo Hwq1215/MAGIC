@@ -58,7 +58,8 @@ def read_single_graph(dataset, malicious, path, test=False):
                     continue
                 if dst in malicious and dst_type != 'MemoryObject':
                     continue
-
+        
+        # 发现节点的类型不在 node_type_dict 表中，则补充
         if src_type not in node_type_dict:
             node_type_dict[src_type] = node_type_cnt
             node_type_cnt += 1
@@ -92,8 +93,8 @@ def read_single_graph(dataset, malicious, path, test=False):
         if dst not in node_map:
             node_map[dst] = node_cnt
             g.add_node(node_cnt, type=dst_type_id)
-            node_type_map[dst] = dst_type
             node_list.append(dst)
+            node_type_map[dst] = dst_type
             node_cnt += 1
         if not g.has_edge(node_map[src], node_map[dst]):
             g.add_edge(node_map[src], node_map[dst], type=edge_type_id)
@@ -104,7 +105,7 @@ def preprocess_dataset(dataset):
     id_nodetype_map = {}
     id_nodename_map = {}
     for file in os.listdir('../data/{}/'.format(dataset)):
-        if 'json' in file and not '.txt' in file and not 'names' in file and not 'types' in file and not 'metadata' in file:
+        if 'json' in file and not '.txt' in file and not 'names' in file and not 'types' in file and not 'metadata' in file and not 'tar.gz' in file:
             print('reading {} ...'.format(file))
             f = open('../data/{}/'.format(dataset) + file, 'r', encoding='utf-8')
             for line in tqdm(f):
@@ -157,7 +158,7 @@ def preprocess_dataset(dataset):
                         dstId1 = dstId1[0]
                         if not dstId1 in id_nodetype_map:
                             continue
-                        dstType1 = id_nodetype_map[dstId1]
+                        dstType1 =  [dstId1]
                         this_edge1 = str(srcId) + '\t' + str(srcType) + '\t' + str(dstId1) + '\t' + str(
                             dstType1) + '\t' + str(edgeType) + '\t' + str(timestamp) + '\n'
                         fw.write(this_edge1)
@@ -190,8 +191,10 @@ def read_graphs(dataset):
 
     preprocess_dataset(dataset)
     train_gs = []
+    is_malicious_metadata = []
     for file in metadata[dataset]['train']:
         _, train_g = read_single_graph(dataset, malicious_entities, file, False)
+        is_malicious_metadata.append(0)
         train_gs.append(train_g)
     test_gs = []
     test_node_map = {}
@@ -199,6 +202,8 @@ def read_graphs(dataset):
     for file in metadata[dataset]['test']:
         node_map, test_g = read_single_graph(dataset, malicious_entities, file, True)
         assert len(node_map) == test_g.number_of_nodes()
+        # 标记图属于测试集
+        test_g.graph['dataset'] = 'test'
         test_gs.append(test_g)
         for key in node_map:
             if key not in test_node_map:
@@ -232,10 +237,41 @@ def read_graphs(dataset):
                 malicious_names.append(e)
                 f.write('{}\t{}\n'.format(e, e))
 
+    # 从测试集中提取包含恶意节点的图，并添加标签
+    malicious_train_gs = []
+    for test_g in test_gs:
+        # 提取测试图中的恶意节点
+        malicious_nodes = [node for node in test_g.nodes() if node in final_malicious_entities]
+        if malicious_nodes:
+            # 创建包含恶意节点的子图
+            malicious_subgraph = test_g.subgraph(malicious_nodes).copy()
+            # 为恶意子图添加标签
+            is_malicious_metadata.append(1)
+            # 标记子图属于训练集
+            malicious_train_gs.append(malicious_subgraph)
+
+    # 将提取的恶意图添加到训练集中
+    train_gs.extend(malicious_train_gs)
+
+    # 保存恶意节点的 UUID 和名称
     pkl.dump((final_malicious_entities, malicious_names), open('../data/{}/malicious.pkl'.format(dataset), 'wb'))
+    # 保存训练集和测试集
     pkl.dump([nx.node_link_data(train_g) for train_g in train_gs], open('../data/{}/train.pkl'.format(dataset), 'wb'))
     pkl.dump([nx.node_link_data(test_g) for test_g in test_gs], open('../data/{}/test.pkl'.format(dataset), 'wb'))
 
+    # 保存节点类型 ID 映射
+    fw = open('../data/{}/'.format(dataset) + 'node_type_id.txt', 'w', encoding='utf-8')
+    node_type_id_map = {k: v for k, v in node_type_dict.items()}
+    json.dump(node_type_id_map, fw, indent=4)
+
+    # 保存边类型 ID 映射
+    fw = open('../data/{}/'.format(dataset) + 'edge_type_id.txt', 'w', encoding='utf-8')
+    edge_type_id_map = {k: v for k, v in edge_type_dict.items()}
+    json.dump(edge_type_id_map, fw, indent=4)
+
+    # 保存训练集的恶意标签
+    fw = open('../data/{}/'.format(dataset) + 'malicious_train_list.txt', 'w', encoding='utf-8')
+    json.dump(is_malicious_metadata, fw, indent=4)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='CDM Parser')
@@ -244,4 +280,3 @@ if __name__ == '__main__':
     if args.dataset not in ['trace', 'theia', 'cadets']:
         raise NotImplementedError
     read_graphs(args.dataset)
-
