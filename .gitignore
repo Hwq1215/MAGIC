@@ -29,4 +29,5 @@ cadets.txt
 /data/wget/._benign
 /data/wget/graphs.pkl
 /data/streamspot/graphs.pkl
+/data/*/*.pkl
 all.tsv

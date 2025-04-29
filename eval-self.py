@@ -10,7 +10,6 @@ from utils.config import build_args
 warnings.filterwarnings('ignore')
 
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 from sklearn.manifold import TSNE
 import os
