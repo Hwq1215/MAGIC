@@ -1,4 +1,5 @@
 import argparse
+from asyncio.windows_events import NULL
 import json
 import os
 import random
@@ -40,6 +41,69 @@ pattern_file_name = re.compile(r'map\":\{\"path\":\"(.*?)\"')
 pattern_process_name = re.compile(r'map\":\{\"name\":\"(.*?)\"')
 pattern_netflow_object_name = re.compile(r'remoteAddress\":\"(.*?)\"')
 
+import networkx as nx
+import random
+import pickle as pkl
+
+import networkx as nx
+import random
+import pickle as pkl
+
+def create_random_malicious_graph(test_g, final_malicious_entities, ratio, dataset):
+    selected_malicious_entities = []
+
+    # 创建一个字典来跟踪访问过的节点
+    visited = {node: False for node in test_g.nodes()}
+    malicious_nodes = [node for node in test_g.nodes() if node in final_malicious_entities]
+    if not malicious_nodes:
+        raise ValueError("没有找到恶意节点")
+
+    current_nodes = []
+    remaining_ratio = ratio
+
+    while len(current_nodes) < int(len(final_malicious_entities) * ratio):
+        # 随机选择一个未访问的恶意节点作为起始节点
+        available_start_nodes = [node for node in malicious_nodes if not visited[node]]
+        if not available_start_nodes:
+            break  # 如果没有未访问的恶意节点，退出循环
+        start_node = random.choice(available_start_nodes)
+        queue = [start_node]
+        visited[start_node] = True
+
+        # 广度优先搜索遍历连通的恶意节点
+        while queue:
+            current_node = queue.pop(0)  # 使用 pop(0) 实现队列的先进先出
+            current_nodes.append(current_node)
+            if len(current_nodes) >= int(len(final_malicious_entities) * ratio):
+                break
+            # 遍历当前节点的所有邻居，包括出边和入边的邻居
+            # 对于有向图，neighbors() 给出节点的出边邻居，predecessors() 给出入边邻居
+            for neighbor in list(test_g.neighbors(current_node)) + list(test_g.predecessors(current_node)):
+                if neighbor in final_malicious_entities and not visited[neighbor]:
+                    visited[neighbor] = True
+                    queue.append(neighbor)
+        if current_nodes:
+            break
+
+    selected_malicious_entities.extend(current_nodes)
+
+    new_graphs = NULL
+
+    # 提取测试图中的恶意节点
+    malicious_nodes = [node for node in test_g.nodes() if node in selected_malicious_entities]
+    if malicious_nodes:
+        # 创建包含恶意节点的子图
+        malicious_subgraph = test_g.subgraph(malicious_nodes).copy()
+        new_graphs = malicious_subgraph
+
+    # 保存选取的恶意几点进入txt文件
+# 保存选取的恶意节点进入txt文件
+    if malicious_nodes:
+        with open("../data/{}/random_malicious_graphs.txt".format(dataset), 'wb') as f:
+            for selected_malicious_entity in selected_malicious_entities:
+                f.write((str(selected_malicious_entity) + '\n').encode('utf-8'))  # 将字符串编码为字节
+        print(f"已将随机恶意节点保存到 ../data/{dataset}/random_malicious_graphs.txt")
+    return new_graphs
 
 def read_single_graph(dataset, malicious, path, test=False):
     global node_type_cnt, edge_type_cnt
@@ -60,7 +124,7 @@ def read_single_graph(dataset, malicious, path, test=False):
                     continue
         
         # 发现节点的类型不在 node_type_dict 表中，则补充
-        if src_type not in node_type_dict:
+        if src_type not in node_type_dict: 
             node_type_dict[src_type] = node_type_cnt
             node_type_cnt += 1
         if dst_type not in node_type_dict:
@@ -239,18 +303,21 @@ def read_graphs(dataset):
 
     # 从测试集中提取包含恶意节点的图，并添加标签
     malicious_train_gs = []
-    for test_g in test_gs:
-        # 提取测试图中的恶意节点
-        malicious_nodes = [node for node in test_g.nodes() if node in final_malicious_entities]
-        if malicious_nodes:
-            # 创建包含恶意节点的子图
-            malicious_subgraph = test_g.subgraph(malicious_nodes).copy()
-            # 为恶意子图添加标签
-            is_malicious_metadata.append(1)
-            # 标记子图属于训练集
-            malicious_train_gs.append(malicious_subgraph)
+    # for test_g in test_gs:
+    #     # 提取测试图中的恶意节点
+    #     malicious_nodes = [node for node in test_g.nodes() if node in final_malicious_entities]
+    #     if malicious_nodes:
+    #         # 创建包含恶意节点的子图
+    #         malicious_subgraph = test_g.subgraph(malicious_nodes).copy()
+    #         # 为恶意子图添加标签
+    #         is_malicious_metadata.append(1)
+    #         # 标记子图属于训练集
+    #         malicious_train_gs.append(malicious_subgraph)
 
     # 将提取的恶意图添加到训练集中
+    for test_g in test_gs:
+        malicious_train_g = create_random_malicious_graph(test_g, final_malicious_entities, 0.1, dataset)
+        malicious_train_gs.append(malicious_train_g)
     train_gs.extend(malicious_train_gs)
 
     # 保存恶意节点的 UUID 和名称
