@@ -49,12 +49,12 @@ import networkx as nx
 import random
 import pickle as pkl
 
-def create_random_malicious_graph(test_g, final_malicious_entities, ratio, dataset):
+def create_random_malicious_graph(test_g, final_malicious_entities, ratio, dataset,start_id=0):
     selected_malicious_entities = []
-
+        
     # 创建一个字典来跟踪访问过的节点
     visited = {node: False for node in test_g.nodes()}
-    malicious_nodes = [node for node in test_g.nodes() if node in final_malicious_entities]
+    malicious_nodes = [node for node in test_g.nodes() if node+start_id in final_malicious_entities]
     if not malicious_nodes:
         raise ValueError("没有找到恶意节点")
 
@@ -79,7 +79,7 @@ def create_random_malicious_graph(test_g, final_malicious_entities, ratio, datas
             # 遍历当前节点的所有邻居，包括出边和入边的邻居
             # 对于有向图，neighbors() 给出节点的出边邻居，predecessors() 给出入边邻居
             for neighbor in list(test_g.neighbors(current_node)) + list(test_g.predecessors(current_node)):
-                if neighbor in final_malicious_entities and not visited[neighbor]:
+                if neighbor in malicious_nodes and not visited[neighbor]:
                     visited[neighbor] = True
                     queue.append(neighbor)
         if current_nodes:
@@ -96,14 +96,15 @@ def create_random_malicious_graph(test_g, final_malicious_entities, ratio, datas
         malicious_subgraph = test_g.subgraph(malicious_nodes).copy()
         new_graphs = malicious_subgraph
 
-    # 保存选取的恶意几点进入txt文件
+
 # 保存选取的恶意节点进入txt文件
     if malicious_nodes:
+        selected_malicious_entities = [entity + start_id for entity in selected_malicious_entities]
         with open("../data/{}/random_malicious_graphs.txt".format(dataset), 'wb') as f:
             for selected_malicious_entity in selected_malicious_entities:
                 f.write((str(selected_malicious_entity) + '\n').encode('utf-8'))  # 将字符串编码为字节
         print(f"已将随机恶意节点保存到 ../data/{dataset}/random_malicious_graphs.txt")
-    return new_graphs
+    return new_graphs,selected_malicious_entities
 
 def read_single_graph(dataset, malicious, path, test=False):
     global node_type_cnt, edge_type_cnt
@@ -222,7 +223,7 @@ def preprocess_dataset(dataset):
                         dstId1 = dstId1[0]
                         if not dstId1 in id_nodetype_map:
                             continue
-                        dstType1 =  [dstId1]
+                        dstType1 =  id_nodetype_map[dstId1]
                         this_edge1 = str(srcId) + '\t' + str(srcType) + '\t' + str(dstId1) + '\t' + str(
                             dstType1) + '\t' + str(edgeType) + '\t' + str(timestamp) + '\n'
                         fw.write(this_edge1)
@@ -303,6 +304,7 @@ def read_graphs(dataset):
 
     # 从测试集中提取包含恶意节点的图，并添加标签
     malicious_train_gs = []
+    train_malicious_nodes = []
     # for test_g in test_gs:
     #     # 提取测试图中的恶意节点
     #     malicious_nodes = [node for node in test_g.nodes() if node in final_malicious_entities]
@@ -315,17 +317,30 @@ def read_graphs(dataset):
     #         malicious_train_gs.append(malicious_subgraph)
 
     # 将提取的恶意图添加到训练集中
-    for test_g in test_gs:
-        malicious_train_g = create_random_malicious_graph(test_g, final_malicious_entities, 0.1, dataset)
-        malicious_train_gs.append(malicious_train_g)
+    if dataset == 'trace':
+        skip_benign = 0
+        for i in range(len(test_gs)):
+            if i != len(test_gs) - 1:
+               g = test_gs[i]
+               skip_benign += g.number_of_nodes()
+        malicious_train_g,select_malicious_nodes = create_random_malicious_graph(test_g, final_malicious_entities, 0.1, dataset,start_id=skip_benign)
+    else:
+        test_g = test_gs[0]
+        malicious_train_g,select_malicious_nodes = create_random_malicious_graph(test_g, final_malicious_entities, 0.1, dataset)
+    is_malicious_metadata.append(1)
+    malicious_train_gs.append(malicious_train_g)
+    train_malicious_nodes.extend(select_malicious_nodes)
     train_gs.extend(malicious_train_gs)
-
+    
     # 保存恶意节点的 UUID 和名称
     pkl.dump((final_malicious_entities, malicious_names), open('../data/{}/malicious.pkl'.format(dataset), 'wb'))
     # 保存训练集和测试集
     pkl.dump([nx.node_link_data(train_g) for train_g in train_gs], open('../data/{}/train.pkl'.format(dataset), 'wb'))
     pkl.dump([nx.node_link_data(test_g) for test_g in test_gs], open('../data/{}/test.pkl'.format(dataset), 'wb'))
 
+    # 保存选取的随机恶意节点
+    pkl.dump(train_malicious_nodes, open('../data/{}/train_malicious_nodes.pkl'.format(dataset), 'wb'))
+    
     # 保存节点类型 ID 映射
     fw = open('../data/{}/'.format(dataset) + 'node_type_id.txt', 'w', encoding='utf-8')
     node_type_id_map = {k: v for k, v in node_type_dict.items()}

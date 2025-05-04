@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "utils里面的文件",
+            "name": "utils里面的文件 --dataset theia",
             "type": "debugpy",
             "request": "launch",
             "program": "${fileBasename}",
@@ -13,7 +13,30 @@
             ],
             "cwd": "${workspaceFolder}/utils"
         },
-
+        {
+            "name": "utils里面的文件 --dataset trace",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${fileBasename}",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset",
+                "trace"
+            ],
+            "cwd": "${workspaceFolder}/utils"
+        },
+        {
+            "name": "utils里面的文件 --dataset cadets",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${fileBasename}",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset",
+                "cadets"
+            ],
+            "cwd": "${workspaceFolder}/utils"
+        },
         {
             "name": "Python: Train Self with Theia Dataset",
             "type": "python",
@@ -22,6 +45,61 @@
             "args": [
                 "--dataset",
                 "theia"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Train Self with Cadets Dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train-self.py",
+            "args": [
+                "--dataset",
+                "cadets"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Train Self with trace Dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train-self.py",
+            "args": [
+                "--dataset",
+                "trace"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: eval Self with Theia Dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/eval-self.py",
+            "args": [
+                "--dataset",
+                "theia"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: eval Self with Cadets Dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/eval-self.py",
+            "args": [
+                "--dataset",
+                "cadets"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: eval Self with Trace Dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/eval-self.py",
+            "args": [
+                "--dataset",
+                "trace"
             ],
             "console": "integratedTerminal"
         }

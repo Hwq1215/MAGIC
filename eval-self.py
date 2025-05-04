@@ -109,6 +109,8 @@ def main(main_args):
         model = model.to(device)
         model.eval()
         malicious, _ = metadata['malicious']
+        #用于训练的恶意节点
+        train_malicious_nodes = metadata['train_malicious_nodes']
         n_train = metadata['n_train']
         n_test = metadata['n_test']
 
@@ -150,7 +152,8 @@ def main(main_args):
             print(f"skip_benign: {skip_benign},x_test.shape[0]: {x_test.shape[0]}")
             test_idx = []
             for i in range(x_test.shape[0]):
-                if i >= skip_benign or y_test[i] == 1.0:
+                if (i >= skip_benign and y_test[i] == 0.0) or (y_test[i] == 1.0 and i not in train_malicious_nodes):
+                # if (i >= skip_benign and y_test[i] == 0.0) or (y_test[i] == 1.0):
                     test_idx.append(i)
             result_x_test = x_test[test_idx]
             result_y_test = y_test[test_idx]

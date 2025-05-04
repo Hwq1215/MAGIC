@@ -146,6 +146,7 @@ def preload_entity_level_dataset(path):
             edge_attrs=['type']
         ) for g in pkl.load(open(path + '/test.pkl', 'rb'))]
         malicious = pkl.load(open(path + '/malicious.pkl', 'rb'))
+        train_malicious_nodes = pkl.load(open(path + '/train_malicious_nodes.pkl', 'rb'))
 
         node_feature_dim = 0
         for g in train_gs:
@@ -174,6 +175,7 @@ def preload_entity_level_dataset(path):
             'edge_feature_dim': edge_feature_dim,
             'malicious': malicious,
             'malicious_labels': malicious_train_list,
+            'train_malicious_nodes': train_malicious_nodes,
             'n_train': len(result_train_gs),
             'n_test': len(result_test_gs)
         }

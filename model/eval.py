@@ -201,16 +201,16 @@ def evaluate_entity_level_using_knn(dataset, x_train, x_test, y_test):
     for i in range(len(f1)):
         # To repeat peak performance
         print(f"rec: {rec[i]}, f1: {f1[i]}\n")
-        if dataset == 'trace' and rec[i] < 0.99979:
+        if dataset == 'trace' and rec[i] < 0.98:
             best_idx = i - 1
             break
-        if dataset == 'theia' and rec[i] < 0.99996:
+        if dataset == 'theia' and rec[i] < 0.95:
             best_idx = i - 1
             break
         # if dataset == 'theia' and rec[i] < 0.975:
         #     best_idx = i - 1
         #     break
-        if dataset == 'cadets' and rec[i] < 0.9976:
+        if dataset == 'cadets' and rec[i] < 0.98:
             best_idx = i - 1
             break
     best_thres = threshold[best_idx]

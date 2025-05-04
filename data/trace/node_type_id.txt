@@ -1,0 +1,13 @@
+{
+    "SUBJECT_PROCESS": 0,
+    "SRCSINK_UNKNOWN": 1,
+    "FILE_OBJECT_UNIX_SOCKET": 2,
+    "NetFlowObject": 3,
+    "FILE_OBJECT_FILE": 4,
+    "MemoryObject": 5,
+    "FILE_OBJECT_CHAR": 6,
+    "FILE_OBJECT_DIR": 7,
+    "UnnamedPipeObject": 8,
+    "FILE_OBJECT_LINK": 9,
+    "FILE_OBJECT_BLOCK": 10
+}
