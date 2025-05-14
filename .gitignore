@@ -24,10 +24,11 @@ ta1-cadets-e3-official*
 cadets.txt
 *.tar.gz
 #unicorn wget
-/data/wget/attack_baseline/
-/data/wget/benign/
-/data/wget/._benign
+/data/wget/raw/
 /data/wget/graphs.pkl
+/data/wget/final
+/data/wget/processed
 /data/streamspot/graphs.pkl
+/data/streamspot/*.json
 /data/*/*.pkl
 all.tsv

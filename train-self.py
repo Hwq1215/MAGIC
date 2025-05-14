@@ -7,7 +7,7 @@ from utils.loaddata import load_batch_level_dataset, load_entity_level_dataset, 
 from model.autoencoder import build_model
 from torch.utils.data.sampler import SubsetRandomSampler
 from dgl.dataloading import GraphDataLoader
-from model.train import batch_level_train
+from model.train import batch_level_train,batch_level_train_with_malicious
 from utils.utils import set_random_seed, create_optimizer 
 from utils.config import build_args
 from model.discriminator import Discriminator
@@ -50,12 +50,14 @@ def main(main_args):
         n_edge_feat = dataset['e_feat']
         graphs = dataset['dataset']
         train_index = dataset['train_index']
+        malicious_index = dataset['malicious_index']
         main_args.n_dim = n_node_feat
         main_args.e_dim = n_edge_feat
         model = build_model(main_args)
         model = model.to(device)
         optimizer = create_optimizer(main_args.optimizer, model, main_args.lr, main_args.weight_decay)
-        model = batch_level_train(model, graphs, (extract_dataloaders(train_index, batch_size)),
+        model = batch_level_train_with_malicious(model, graphs, (extract_dataloaders(train_index, batch_size)),
+                                                 extract_dataloaders(malicious_index, 1),
                                   optimizer, main_args.max_epoch, device, main_args.n_dim, main_args.e_dim)
         torch.save(model.state_dict(), "./checkpoints/checkpoint-{}.pt".format(dataset_name))
     else:

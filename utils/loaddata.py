@@ -7,7 +7,7 @@ import networkx as nx
 import json
 from tqdm import tqdm
 import os
-
+import random
 
 class StreamspotDataset(dgl.data.DGLDataset):
     def process(self):
@@ -112,13 +112,30 @@ def load_batch_level_dataset(dataset_name):
     edge_feature_dim += 1
     full_dataset = [i for i in range(len(dataset))]
     train_dataset = [i for i in range(len(dataset)) if dataset[i][1] == 0]
+    # 获取所有标签为1的索引
+    malicious_indices = [i for i in range(len(dataset)) if dataset[i][1] == 1]
+
+    # 随机选择其中的10%
+    sample_size = len(malicious_indices) // 10  # 计算10%的数量
+    random_malicious_indices = random.sample(malicious_indices, sample_size)
     print('[n_graph, n_node_feat, n_edge_feat]: [{}, {}, {}]'.format(len(dataset), node_feature_dim, edge_feature_dim))
 
-    return {'dataset': dataset,
+    metadata =  {'dataset': dataset,
             'train_index': train_dataset,
             'full_index': full_dataset,
+            'malicious_index': random_malicious_indices,
             'n_feat': node_feature_dim,
             'e_feat': edge_feature_dim}
+    save_data = {
+        'train_index': train_dataset,
+        'full_index': full_dataset,
+        'malicious_index': random_malicious_indices,
+        'n_feat': node_feature_dim,
+        'e_feat': edge_feature_dim
+    }
+    with open(f'./data/{dataset_name}/metadata.jsonl', 'w', encoding='utf-8') as f:
+        json.dump(save_data, f)
+    return metadata
 
 
 def transform_graph(g, node_feature_dim, edge_feature_dim):

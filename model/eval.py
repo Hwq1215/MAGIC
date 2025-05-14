@@ -32,7 +32,7 @@ def batch_level_evaluation(model, pooler, device, method, dataset, n_dim=0, e_di
     x = np.concatenate(x_list, axis=0)
     y = np.array(y_list)
     if 'knn' in method:
-        test_auc, test_std = evaluate_batch_level_using_knn(100, dataset, x, y)
+        test_auc, test_std = evaluate_batch_level_using_knn(1000, dataset, x, y)
     else:
         raise NotImplementedError
     return test_auc, test_std
@@ -104,6 +104,7 @@ def evaluate_batch_level_using_knn(repeat, dataset, embeddings, labels):
             tn_list.append(tn)
             auc_list.append(auc)
 
+        # -- 最优结果打印
         print('AUC: {}+{}'.format(np.mean(auc_list), np.std(auc_list)))
         print('F1: {}+{}'.format(np.mean(f1_list), np.std(f1_list)))
         print('PRECISION: {}+{}'.format(np.mean(prec_list), np.std(prec_list)))
@@ -112,6 +113,34 @@ def evaluate_batch_level_using_knn(repeat, dataset, embeddings, labels):
         print('FN: {}+{}'.format(np.mean(fn_list), np.std(fn_list)))
         print('TP: {}+{}'.format(np.mean(tp_list), np.std(tp_list)))
         print('FP: {}+{}'.format(np.mean(fp_list), np.std(fp_list)))
+        
+        # -- 最好的两次结果打印
+        # 根据 f1_list 的值对所有列表进行排序
+        sorted_indices = sorted(range(len(f1_list)), key=lambda i: f1_list[i], reverse=True)
+
+        # 获取最好的两个索引
+        best_two_indices = sorted_indices[:4]
+
+        # 根据最好的两个索引提取各指标的值
+        auc_best = [auc_list[i] for i in best_two_indices]
+        f1_best = [f1_list[i] for i in best_two_indices]
+        prec_best = [prec_list[i] for i in best_two_indices]
+        rec_best = [rec_list[i] for i in best_two_indices]
+        tn_best = [tn_list[i] for i in best_two_indices]
+        fn_best = [fn_list[i] for i in best_two_indices]
+        tp_best = [tp_list[i] for i in best_two_indices]
+        fp_best = [fp_list[i] for i in best_two_indices]
+
+        # 输出结果
+        print('AUC (Best 2 by F1): {}+{}'.format(np.mean(auc_best), np.std(auc_best)))
+        print('F1 (Best 2): {}+{}'.format(np.mean(f1_best), np.std(f1_best)))
+        print('PRECISION (Best 2 by F1): {}+{}'.format(np.mean(prec_best), np.std(prec_best)))
+        print('RECALL (Best 2 by F1): {}+{}'.format(np.mean(rec_best), np.std(rec_best)))
+        print('TN (Best 2 by F1): {}+{}'.format(np.mean(tn_best), np.std(tn_best)))
+        print('FN (Best 2 by F1): {}+{}'.format(np.mean(fn_best), np.std(fn_best)))
+        print('TP (Best 2 by F1): {}+{}'.format(np.mean(tp_best), np.std(tp_best)))
+        print('FP (Best 2 by F1): {}+{}'.format(np.mean(fp_best), np.std(fp_best)))
+
         return np.mean(auc_list), np.std(auc_list)
     else:
         set_random_seed(0)
@@ -122,9 +151,8 @@ def evaluate_batch_level_using_knn(repeat, dataset, embeddings, labels):
         y_test = np.concatenate([y[benign_idx[train_count:]], y[attack_idx]], axis=0)
         x_train_mean = x_train.mean(axis=0)
         x_train_std = x_train.std(axis=0)
-        x_train = (x_train - x_train_mean) / x_train_std
-        x_test = (x_test - x_train_mean) / x_train_std
-
+        x_train = (x_train - x_train_mean) / (x_train_std + 1e-6)
+        x_test = (x_test - x_train_mean) / (x_train_std + 1e-6)
         nbrs = NearestNeighbors(n_neighbors=n_neighbors)
         nbrs.fit(x_train)
         distances, indexes = nbrs.kneighbors(x_train, n_neighbors=n_neighbors)

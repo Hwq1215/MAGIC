@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "utils里面的文件 --dataset theia",
             "type": "debugpy",
@@ -38,6 +39,16 @@
             "cwd": "${workspaceFolder}/utils"
         },
         {
+            "name": "utils里面的文件 --dataset streamspot or unicorn",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${fileBasename}",
+            "console": "integratedTerminal",
+            "args": [
+            ],
+            "cwd": "${workspaceFolder}/utils"
+        },
+        {
             "name": "Python: Train Self with Theia Dataset",
             "type": "python",
             "request": "launch",
@@ -67,6 +78,17 @@
             "args": [
                 "--dataset",
                 "trace"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Train Self with steamspot Dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/train-self.py",
+            "args": [
+                "--dataset",
+                "streamspot"
             ],
             "console": "integratedTerminal"
         },

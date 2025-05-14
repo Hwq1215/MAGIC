@@ -143,13 +143,14 @@ class GMAEModel(nn.Module):
 
         return new_g, (mask_nodes, keep_nodes)
 
-    def forward1(self, g):
-        loss = self.compute_loss(g)
-        return loss
+    # def forward(self, g):
+    #     loss = self.compute_loss(g)
+    #     return loss
 
     def forward(self, g, label,dif_g):
         loss = self.compute_loss(g,label,dif_g)
         return loss
+
     def compute_loss(self, g , label=None,diffent_g=None):
         # Feature Reconstruction
         pre_use_g, (mask_nodes, keep_nodes) = self.encoding_mask_noise(g, self._mask_rate)
@@ -233,11 +234,6 @@ class GMAEModel(nn.Module):
         loss = recon_rec_val + recon_loss_val + supervised_loss + contrastive_loss_val + compactness_loss_val
         print(f"recon_rec_val: {recon_rec_val.item()}, recon_loss_val: {recon_loss_val.item()}, supervised_loss: {supervised_loss.item()}, contrastive_loss:{contrastive_loss_val.item()}\n")
         return loss
-        
-
-
-        
-
     def embed(self, g):
         x = g.ndata['attr'].to(g.device)
         rep = self.encoder(g, x)
